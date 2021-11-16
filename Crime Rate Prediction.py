@@ -51,267 +51,347 @@
 
 # # STEP #1: IMPORTING DATA
 
-# In[1]:
-
-
-import pandas as pd 
-import numpy as np 
-import matplotlib.pyplot as plt
-import random
-import seaborn as sns
-from fbprophet import Prophet
-
-
 # In[2]:
 
 
-# dataframes creation for both training and testing datasets 
-chicago_df_1 = pd.read_csv('Chicago_Crimes_2005_to_2007.csv', error_bad_lines=False)
-chicago_df_2 = pd.read_csv('Chicago_Crimes_2008_to_2011.csv', error_bad_lines=False)
-chicago_df_3 = pd.read_csv('Chicago_Crimes_2012_to_2017.csv', error_bad_lines=False)
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+from fbprophet import Prophet
 
 
 # In[3]:
 
 
+df_chicago_1=pd.read_csv('Chicago_Crimes_2005_to_2007.csv', error_bad_lines=False)
+df_chicago_2=pd.read_csv('Chicago_Crimes_2008_to_2011.csv', error_bad_lines=False)
+df_chicago_3=pd.read_csv('Chicago_Crimes_2012_to_2017.csv', error_bad_lines=False)
 
-chicago_df = pd.concat([chicago_df_1, chicago_df_2, chicago_df_3], ignore_index=False, axis=0)
+#We have errors because of the data quality. we will ignore the errors.
 
 
-# # STEP #2: EXPLORING THE DATASET  
+# As you see we have 3 datasets, but we will work on all values between 2005-2017, because of that we can bring together all datasets, which means we will concatinate the datasets:
 
 # In[4]:
 
 
-# Let's view the head of the training dataset
-chicago_df.head()
+df_chicago=pd.concat([df_chicago_1,df_chicago_2,df_chicago_3])
 
 
 # In[5]:
 
 
-# Let's view the last elements in the training dataset
-chicago_df.tail(20)
+df_chicago_1.shape
 
 
 # In[6]:
 
 
-# Let's see how many null elements are contained in the data
-plt.figure(figsize=(10,10))
-sns.heatmap(chicago_df.isnull(), cbar = False, cmap = 'YlGnBu')
+df_chicago_2.shape
 
 
 # In[7]:
 
 
-# ID Case Number Date Block IUCR Primary Type Description Location Description Arrest Domestic Beat District Ward Community Area FBI Code X Coordinate Y Coordinate Year Updated On Latitude Longitude Location
-chicago_df.drop(['Unnamed: 0', 'Case Number', 'Case Number', 'IUCR', 'X Coordinate', 'Y Coordinate','Updated On','Year', 'FBI Code', 'Beat','Ward','Community Area', 'Location', 'District', 'Latitude' , 'Longitude'], inplace=True, axis=1)
+df_chicago_3.shape
 
 
 # In[8]:
 
 
-chicago_df
+df_chicago.shape
 
+
+# # STEP #2: EXPLORING THE DATASET  
 
 # In[9]:
 
 
-# Assembling a datetime by rearranging the dataframe column "Date". 
-
-chicago_df.Date = pd.to_datetime(chicago_df.Date, format='%m/%d/%Y %I:%M:%S %p')
-
-
-# In[10]:
-
-
-chicago_df
+df_chicago.head()
 
 
 # In[11]:
 
 
-# setting the index to be the date 
-chicago_df.index = pd.DatetimeIndex(chicago_df.Date)
+df_chicago.tail()
+
+
+# ### Now let's see if we have any missing values:
+
+# In[12]:
+
+
+plt.figure(figsize=(10,10))  #Here the pyplot figure size is width and height by inches.
+sns.heatmap(df_chicago.isnull(), cbar=False, cmap='YlGnBu')  #We do not need color bar, so it is False.
+
+
+# In[10]:
+
+
+df_chicago.drop(['Unnamed: 0', 'Case Number', 'Case Number', 'IUCR', 'X Coordinate', 'Y Coordinate','Updated On','Year', 'FBI Code', 'Beat','Ward','Community Area', 'Location', 'District', 'Latitude' , 'Longitude'], inplace=True, axis=1)
+
+
+# In[11]:
+
+
+df_chicago.drop(['ID'], inplace=True, axis=1)
 
 
 # In[12]:
 
 
-chicago_df
+df_chicago
 
+
+# ### We need a proper date time format in order to use the Prophet. Now the Date column is just a string.
 
 # In[13]:
 
 
-chicago_df['Primary Type'].value_counts()
+df_chicago.Date=pd.to_datetime(df_chicago.Date, format='%m/%d/%Y %I:%M:%S %p')
 
 
 # In[14]:
 
 
-chicago_df['Primary Type'].value_counts().iloc[:15]
+df_chicago   # As you see the Date column has changed:
 
+
+# ### Now let's see how many count we have for each "Primary Type"
 
 # In[15]:
 
 
-chicago_df['Primary Type'].value_counts().iloc[:15].index
+df_chicago['Primary Type'].value_counts()
 
+
+# #### If you want to see the TOP XXX Labels, you can add "iloc"
 
 # In[16]:
 
 
-plt.figure(figsize = (15, 10))
-sns.countplot(y= 'Primary Type', data = chicago_df, order = chicago_df['Primary Type'].value_counts().iloc[:15].index)
+df_chicago['Primary Type'].value_counts().iloc[:10]  #Top 10 Crimes
 
+
+# #### Let's get index to each label:
 
 # In[17]:
 
 
-plt.figure(figsize = (15, 10))
-sns.countplot(y= 'Location Description', data = chicago_df, order = chicago_df['Location Description'].value_counts().iloc[:15].index)
+df_chicago['Primary Type'].value_counts().iloc[:10].index
 
+
+# ### Let's plot the top 10 as a graphic by using seaborn:
 
 # In[18]:
 
 
-chicago_df.resample('Y').size()
+primary_type_order=df_chicago['Primary Type'].value_counts().iloc[:10].index  #We will get order info to plot in an order
 
 
 # In[19]:
 
 
-# Resample is a Convenience method for frequency conversion and resampling of time series.
-
-plt.plot(chicago_df.resample('Y').size())
-plt.title('Crimes Count Per Year')
-plt.xlabel('Years')
-plt.ylabel('Number of Crimes')
+plt.figure(figsize=(10,10))
+sns.countplot(y='Primary Type', data=df_chicago, order=primary_type_order)
 
 
-# In[20]:
+# ### This time let's plot the "Location Description" column:
+
+# In[33]:
 
 
-chicago_df.resample('M').size()
+plt.figure(figsize=(15,10))
+sns.countplot(y='Location Description', data=df_chicago, order=df_chicago['Location Description'].value_counts().iloc[:10].index)
 
+
+# #### Now we will set the "Date" column as the dataframe index:
 
 # In[21]:
 
 
-# Resample is a Convenience method for frequency conversion and resampling of time series.
-
-plt.plot(chicago_df.resample('M').size())
-plt.title('Crimes Count Per Month')
-plt.xlabel('Months')
-plt.ylabel('Number of Crimes')
+df_chicago.index=pd.DatetimeIndex(df_chicago.Date)
 
 
 # In[22]:
 
 
-chicago_df.resample('Q').size()
+df_chicago  #Index column is shown as bold
 
+
+# #### We want to look the total incidents for each year, for this we will use "resample":
+# #### Resample is a Convenience method for frequency conversion and resampling of time series.
 
 # In[23]:
 
 
-# Resample is a Convenience method for frequency conversion and resampling of time series.
-
-plt.plot(chicago_df.resample('Q').size())
-plt.title('Crimes Count Per Quarter')
-plt.xlabel('Quarters')
-plt.ylabel('Number of Crimes')
+df_chicago.resample('Y').size()
 
 
-# # STEP #3: PREPARING THE DATA
+# #### Let's plot this statistic:
 
 # In[24]:
 
 
-chicago_prophet = chicago_df.resample('M').size().reset_index()
+plt.plot(df_chicago.resample('Y').size())
+plt.title('Total Number of Crimes per Year')
+plt.xlabel('Years')
+plt.ylabel('Number of Crimes')
 
 
 # In[25]:
 
 
-chicago_prophet
-
-
-# In[26]:
-
-
-chicago_prophet.columns = ['Date', 'Crime Count']
+plt.plot(df_chicago.resample('M').size())
+plt.title('Total Number of Crimes per Month')
+plt.xlabel('Month')
+plt.ylabel('Number of Crimes')
 
 
 # In[27]:
 
 
-chicago_prophet
+plt.plot(df_chicago.resample('Q').size())
+plt.title('Total Number of Crimes per Quarter')
+plt.xlabel('Quarter')
+plt.ylabel('Number of Crimes')
 
+
+# # STEP #3: PREPARING THE DATA
+
+# ### New we will use Prophet
 
 # In[28]:
 
 
-chicago_prophet_df = pd.DataFrame(chicago_prophet)
+chicago_prophet=df_chicago.resample('M').size()
 
 
 # In[29]:
 
 
-chicago_prophet_df
+chicago_prophet
 
 
-# # STEP #4: MAKE PREDICTIONS
+# #### As you see above, for the resample output, we do not have a row index other than Date column. Let's create index:
 
 # In[30]:
 
 
-chicago_prophet_df.columns
+chicago_prophet=df_chicago.resample('M').size().reset_index()
 
 
 # In[31]:
 
 
-chicago_prophet_df_final = chicago_prophet_df.rename(columns={'Date':'ds', 'Crime Count':'y'})
-
-
-# In[32]:
-
-
-chicago_prophet_df_final
-
-
-# In[33]:
-
-
-m = Prophet()
-m.fit(chicago_prophet_df_final)
+chicago_prophet
 
 
 # In[34]:
 
 
-# Forcasting into the future
-future = m.make_future_dataframe(periods=365)
-forecast = m.predict(future)
+chicago_prophet.columns=['Date','Crime Count']
 
 
 # In[35]:
 
 
-forecast
+chicago_prophet
 
 
 # In[36]:
 
 
-figure = m.plot(forecast, xlabel='Date', ylabel='Crime Rate')
+df_chicago_prophet=chicago_prophet.rename(columns={'Date':'ds', 'Crime Count':'y'})
 
 
 # In[37]:
 
 
-figure3 = m.plot_components(forecast)
+df_chicago_prophet
+
+
+# # STEP #4: MAKE PREDICTIONS
+
+# In[38]:
+
+
+model=Prophet()
+model.fit(df_chicago_prophet)
+
+
+# ### Now model is ready. Next, we should tell the prophet model which future should it predict:
+
+# In[48]:
+
+
+future_one_year=model.make_future_dataframe(periods=365)
+
+
+# In[49]:
+
+
+forecast_one_year=model.predict(future)
+
+
+# In[50]:
+
+
+forecast_one_year
+
+
+# In[51]:
+
+
+figure=model.plot(forecast_one_year, xlabel='Date', ylabel='Crime Rate')
+
+
+# ### We can also plot as trend, for this, instead of writing "plot", we write "plot_components":
+
+# In[52]:
+
+
+figure_trend=model.plot_components(forecast_one_year)
+
+
+# In[53]:
+
+
+future_two_years=model.make_future_dataframe(periods=730)
+
+
+# In[54]:
+
+
+forecast_two_years=model.predict(future_two_years)
+
+
+# In[59]:
+
+
+figure_two_years=model.plot(forecast_two_years, xlabel='Date', ylabel='Crime Rate')
+
+
+# In[58]:
+
+
+figure_two_years_trend=model.plot_components(forecast_two_years)
+
+
+# ### Thanks!
+
+# If you have any question please feel free to contact with me:
+# * github.com/EmrahYener
+# * linkedin.com/in/emrah-yener
+# * xing.com/profile/emrah_yener
+# 
+# Sources:
+# * https://www.udemy.com/course/deep-learning-machine-learning-practical/
+# 
+
+# In[ ]:
+
+
+
 
